@@ -1,5 +1,8 @@
 import org.unifize.discountplatform.domain.*;
+import org.unifize.discountplatform.domain.payment.*;
+import org.unifize.discountplatform.domain.strategy.*;
 import org.unifize.discountplatform.engine.DiscountCalculator;
+
 import java.util.*;
 
 /**
@@ -16,14 +19,14 @@ public class Main {
                         Money.ofRupees(4999), 1)
         );
 
-        // Create payment method (ICICI Credit Card)
-        PaymentMethod payment = new PaymentMethod("ICICI", "CREDIT");
+        // Create payment method using factory (NEW - Factory Pattern)
+        PaymentMethod payment = PaymentMethodFactory.createCreditCard("ICICI", "VISA");
 
         // Create cart
         Cart cart = new Cart("cart-123", items, payment, "cust-456", "STANDARD");
 
-        // Create discounts from the assignment
-        List<Discount> discounts = createDiscounts();
+        // Create discount strategies (NEW - Strategy Pattern)
+        List<DiscountStrategy> discounts = createDiscountStrategies();
 
         // Calculate discounts
         DiscountCalculator calculator = new DiscountCalculator();
@@ -36,44 +39,43 @@ public class Main {
         System.out.println(result.getReasoning());
     }
 
-    private static List<Discount> createDiscounts() {
+    private static List<DiscountStrategy> createDiscountStrategies() {
         return Arrays.asList(
                 // 1. Brand discount: 40% off PUMA
-                Discount.builder()
+                BrandDiscount.builder()
                         .id("BRAND_PUMA_40")
-                        .type(DiscountType.BRAND)
                         .description("40% off PUMA items")
                         .discountPercent(40)
                         .targetBrand("PUMA")
                         .build(),
 
                 // 2. Category discount: 10% off T-shirts (stackable)
-                Discount.builder()
+                CategoryDiscount.builder()
                         .id("CAT_TSHIRT_10")
-                        .type(DiscountType.CATEGORY)
                         .description("10% off T-shirts")
                         .discountPercent(10)
                         .targetCategory("T-shirts")
                         .build(),
 
-                // 3. Voucher: SUPER69 - 69% off, excludes Nike, max cap ₹500
-                Discount.builder()
+                // 3. Voucher: SUPER69 - 69% off, excludes Nike, max cap Rs.500
+                // NEW: Now includes voucherCode field
+                VoucherDiscount.builder()
                         .id("SUPER69")
-                        .type(DiscountType.VOUCHER)
+                        .voucherCode("SUPER69")
                         .description("69% off with SUPER69 voucher")
                         .discountPercent(69)
                         .excludedBrands(new HashSet<>(Arrays.asList("Nike")))
                         .maxDiscountCap(Money.ofRupees(500))
                         .build(),
 
-                // 4. Payment offer: 10% ICICI, max ₹200, min cart ₹2000
-                Discount.builder()
+                // 4. Payment offer: 10% ICICI, max Rs.200, min cart Rs.2000
+                // NEW: Now includes paymentMode field
+                PaymentDiscount.builder()
                         .id("ICICI_10")
-                        .type(DiscountType.PAYMENT)
+                        .paymentMode(PaymentMode.CREDIT_CARD)
                         .description("10% instant discount on ICICI credit cards")
                         .discountPercent(10)
                         .requiredBank("ICICI")
-                        .requiredCardType("CREDIT")
                         .maxDiscountCap(Money.ofRupees(200))
                         .minCartValue(Money.ofRupees(2000))
                         .build()

@@ -1,4 +1,4 @@
-# domain.org.unifize.discountplatform.src.org.unifize.discount.Discount Platform
+# E-commerce Discount Platform
 
 A discount calculation engine for a fashion e-commerce platform supporting multiple discount types with configurable stacking and priority rules.
 
@@ -22,7 +22,7 @@ This platform calculates final pricing after applying multiple discount types:
 
 ## Canonical Models
 
-### 1. Brand domain.org.unifize.discountplatform.src.org.unifize.discount.Discount
+### 1. Brand Discount
 
 ```json
 {
@@ -31,23 +31,27 @@ This platform calculates final pricing after applying multiple discount types:
   "description": "40% off on all PUMA items",
   "targetBrand": "PUMA",
   "discountPercent": 40,
-  "priority": 1,
-  "active": true
+  "priority": 1000,
+  "active": true,
+  "created_date_time": 1768642127,
+  "last_updated_date_time": 1768642127
 }
 ```
 
-### 2. Category domain.org.unifize.discountplatform.src.org.unifize.discount.Discount
+### 2. Category Discount
 
 ```json
 {
   "id": "CAT_TSHIRT_10",
   "type": "CATEGORY",
   "description": "Extra 10% off on all T-shirts",
-  "targetCategory": "T-shirts",
+  "targetCategory": "tshirts",
   "discountPercent": 10,
   "stackable": true,
-  "priority": 2,
-  "active": true
+  "priority": 2000,
+  "active": true,
+  "created_date_time": 1768642127,
+  "last_updated_date_time": 1768642127
 }
 ```
 
@@ -57,6 +61,7 @@ This platform calculates final pricing after applying multiple discount types:
 {
   "id": "SUPER69",
   "type": "VOUCHER",
+  "voucher_code": "SUPER69",
   "description": "69% off with SUPER69 code",
   "discountPercent": 69,
   "maxDiscountCap": 500,
@@ -64,8 +69,10 @@ This platform calculates final pricing after applying multiple discount types:
   "minCustomerTier": "STANDARD",
   "validFrom": "2024-01-01",
   "validTo": "2024-12-31",
-  "priority": 3,
-  "active": true
+  "priority": 3000,
+  "active": true,
+  "created_date_time": 1768642127,
+  "last_updated_date_time": 1768642127
 }
 ```
 
@@ -75,14 +82,17 @@ This platform calculates final pricing after applying multiple discount types:
 {
   "id": "ICICI_10",
   "type": "PAYMENT",
+  "payment_mode": "credit_card",
   "description": "10% instant discount on ICICI credit cards",
   "bank": "ICICI",
   "cardType": "CREDIT",
   "discountPercent": 10,
   "maxDiscountCap": 200,
   "minCartValue": 2000,
-  "priority": 4,
-  "active": true
+  "priority": 4000,
+  "active": true,
+  "created_date_time": 1768642127,
+  "last_updated_date_time": 1768642127
 }
 ```
 
@@ -92,108 +102,42 @@ This platform calculates final pricing after applying multiple discount types:
 
 ### 1. How do you handle conflicting discounts?
 
-**Approach: Stacking with Priority Order**
+#### Non-stackable Discounts
+- Only the highest-value discount at that level is applied.
 
-All applicable discounts **stack sequentially** rather than compete. Each discount applies to the **running discounted price** from the previous step.
+#### Explicit Exclusions
+- Explicit exclusions (e.g. *Nike excluded from SUPER69*) are evaluated per cart item.
 
-```
-Original Price → Brand domain.org.unifize.discountplatform.src.org.unifize.discount.Discount → Category domain.org.unifize.discountplatform.src.org.unifize.discount.Discount → Voucher → Payment Offer → Final Price
-```
-
-**Rationale:**
-- Stacking provides better customer value and clearer reasoning
-- Priority order ensures consistent, predictable results
-- Each discount type operates on a different "layer" (product vs. cart vs. payment)
-
-**Exclusion Handling:**
-- Voucher exclusions (e.g., `excludedBrands: ["Nike"]`) skip specific items
-- Payment offers have eligibility rules (card type, min cart value)
+#### Conflicting brand or category discounts
+- This can be handled probably by last_updated_date_time where we fetch the latest updated discount and ofcourse is active
 
 ### 2. How do you control the order of discount application?
 
-**Fixed Priority Pipeline:**
+Discounts are applied in an explicit priority-based order.
 
-| Priority | Type | Scope | Rationale |
-|----------|------|-------|-----------|
-| 1 | Brand | Per-item | Applied first as it's the most specific product-level discount |
-| 2 | Category | Per-item | Stacks on brand-discounted price for eligible categories |
-| 3 | Voucher | Per-item (with exclusions) | User-initiated discount with constraints |
-| 4 | Payment | domain.org.unifize.discountplatform.src.org.unifize.discount.Cart-level | Applied last to final cart total (bank partnership) |
+#### Order of Application
+- Brand discounts
+- Category discounts
+- Voucher discounts
+- Payment offers
 
-**Implementation:**
-```java
-discounts.sort(Comparator.comparing(Discount::getPriority));
-for (Discount discount : discounts) {
-    result = applyDiscount(cart, discount, result);
-}
-```
+#### Why
+- Item-level discounts should reduce the base price first.
+- Vouchers operate on the already-discounted subtotal.
+- Payment offers apply last on the payable amount.
+
+This is enforced using a `priority` field on each rule type.
 
 ### 3. How do you enforce upper thresholds on discount?
 
-**Three-Level Cap Enforcement:**
-
-1. **Per-Rule Cap** (`maxDiscountCap`)
-   ```java
-   long discountAmount = calculatePercentageDiscount(price, percent);
-   if (rule.getMaxDiscountCap() != null) {
-       discountAmount = Math.min(discountAmount, rule.getMaxDiscountCap());
-   }
-   ```
-
-2. **Per-Item Cap** (discount cannot exceed item price)
-   ```java
-   discountAmount = Math.min(discountAmount, item.getCurrentPrice());
-   ```
-
-3. **Min domain.org.unifize.discountplatform.src.org.unifize.discount.Cart Value** (for payment offers)
-   ```java
-   if (cart.getTotal() < paymentOffer.getMinCartValue()) {
-       return domain.org.unifize.discountplatform.src.org.unifize.discount.DiscountResult.skipped("domain.org.unifize.discountplatform.src.org.unifize.discount.Cart below minimum value");
-   }
-   ```
+Each discount calculation:
+- Compute raw discount
+- Apply `min(rawDiscount, maxCap)`
+- Record both values for transparency in reasoning
 
 ---
+## Architecture
 
-## Quick Start
+Please refer to docs/architecture.pdf for the diagram and other details
 
-### Run the Example
 
-```bash
-cd src/main/java
-javac discount/**/*.java
-java discount.Main
-```
-
-### Expected Output
-
-```
-=== domain.org.unifize.discountplatform.src.org.unifize.discount.Discount Calculation Result ===
-Original Total: ₹6,997.00
-Final Price: ₹5,377.92
-
-Applied Discounts:
-1. BRAND_PUMA_40: -₹799.20 (40% off PUMA items)
-2. CAT_TSHIRT_10: -₹119.88 (10% off T-shirts)
-3. SUPER69: -₹500.00 (69% off, capped at ₹500)
-4. ICICI_10: -₹200.00 (10% ICICI, capped at ₹200)
-
-Total Savings: ₹1,619.08
-```
-
----
-
-## Project Structure
-
-```
-discount-platform/
-├── README.md                      # This file
-├── docs/
-│   ├── architecture.md            # System design & diagrams
-│   ├── review-notes.md            # Code review improvements
-│   └── testing-strategy.md        # Testing approach
-└── src/
-    └── main/java/discount/
-        ├── domain/                # Core domain types
-        ├── engine/                # domain.org.unifize.discountplatform.src.org.unifize.discount.Discount calculation logic
-        └── Main.java              # Entry point with example
-```

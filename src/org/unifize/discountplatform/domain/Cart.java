@@ -1,5 +1,7 @@
 package org.unifize.discountplatform.domain;
 
+import org.unifize.discountplatform.domain.payment.PaymentMethod;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
